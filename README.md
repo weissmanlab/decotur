@@ -24,6 +24,12 @@ To install DeCoTUR, run
 
 `install_github("weissmanlab/decotur")`
 
+You may also have to install the library `PoissonBinomial` via `install.packages('PoissonBinomial')`.
+
+To load DeCoTUR, run
+`library(DeCoTUR)`
+`library(PoissonBinomial)`
+
 ## Using DeCoTUR
 The primary function you would want to use is
 
