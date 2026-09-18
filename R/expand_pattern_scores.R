@@ -6,7 +6,7 @@
 #'@param pattern_scores In get_scores_pa_closepairs
 #'@param pattern_map In get_scores_pa_closepairs
 
-expand_pattern_scores <- function(pattern_scores, pattern_map) {
+.expand_pattern_scores <- function(pattern_scores, pattern_map) {
 
   ## Split trait names once rather than repeatedly searching the map
   traits_by_pattern <- split(pattern_map$Trait,pattern_map$Pattern)
