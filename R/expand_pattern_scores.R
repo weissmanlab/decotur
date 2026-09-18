@@ -3,8 +3,8 @@
 #' This helper function takes compressed pattern scores
 #' and restores the human-readable gene name table.
 
-#'@param pa_matrix A presence-absence matrix for the trait in question (i.e. gene, allele, phenotype, etc.). Rows are trait, columns are sample. Rownames should be trait names, colnames should be sample names.
-#'@param closepairs A matrix of close pairs, with each row a pair and each column one of the two sample indices
+#'@param pattern_scores In get_scores_pa_closepairs
+#'@param pattern_map In get_scores_pa_closepairs
 
 expand_pattern_scores <- function(pattern_scores, pattern_map) {
 
