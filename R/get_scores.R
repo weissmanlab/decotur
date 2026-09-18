@@ -164,24 +164,18 @@ get_scores <- function(
   ## 6. Prepare close-pair distances for null model
   ## ------------------------------------------------------------
 
-  # Preserve the behavior of the previous implementation for negative
-  # distances.
-  dpds[dpds < 0] <- 1 / (2 * 1000000)
+  dpds <- as.numeric(distance_matrix[close_pairs])
+
+  if (any(!is.finite(dpds))) {stop("Close-pair distances contain non-finite values.")}
+
+  if (any(dpds < 0)) {
+    .verbose_message(verbose, sum(dpds < 0), " negative close-pair distances were set to zero.")
+    dpds[dpds < 0] <- 0
+  }
+    
+  if (sum(dpds) == 0) {stop("Close-pair distances must contain at least one positive value.")}
 
   ndpds <- dpds / sum(dpds)
-
-  # Replace exact zeros with a small positive value.
-  if (any(ndpds == 0)) {
-
-    positive_dpds <- ndpds[ndpds > 0]
-
-    if (length(positive_dpds) == 0) {
-      stop("All close-pair distances are zero.")
-    }
-
-    ndpds[ndpds == 0] <-
-      min(positive_dpds) / 100
-  }
 
   ## ------------------------------------------------------------
   ## 7. Compute significance at the pattern level
