@@ -164,8 +164,6 @@ get_scores <- function(
   ## 6. Prepare close-pair distances for null model
   ## ------------------------------------------------------------
 
-  dpds <- as.numeric(distance_matrix[close_pairs])
-
   if (any(!is.finite(dpds))) {stop("Close-pair distances contain non-finite values.")}
 
   if (any(dpds < 0)) {
