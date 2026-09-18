@@ -1,118 +1,286 @@
 #' get_scores
 #'
-#' This function takes a presence-absence matrix, a distance matrix, a choice of
-#' how to determine close pairs, and a list of relevant parameters for that choice,
-#' and returns the close pair scores. There is an option for whether or not to
-#' downweight bushes. There is also an option to return significance levels.
-#' Finally there is an option to run (relatively) speed-optimized or memory-optimized versions of
-#' this process.
+#' Computes DeCoTUR scores and identifies significantly associated trait pairs.
 #'
-#'@param pa_matrix A presence-absence matrix for the trait in question (i.e. gene, allele, phenotype, etc.). Rows are trait, columns are sample. Rownames should be trait names, colnames should be sample names.
-#'@param distance_matrix A distance matrix. Rownames and colnames should be sample names and should be in the same order as the columns in pa_matrix.
-#'@param closepair_method Either 'distance', 'fraction', or 'fixednumber'.
-#'@param closepair_params A list. For 'distance', the distance cutoff and show_hist. For 'fraction', the fraction and show_hist. For 'fixednumber', the number of close pairs, a random seed, and show_hist. For 'auto', the which_valley, nbins, maxvalleyheight, and show_hist. verbose is inherited from the main function call.
-#'@param blocksize The number of traits to consider at once in the computation. Changing this number may help speed up the computation. Must be less than or equal to the number of traits.
-#'@param downweight TRUE to downweight bushes. Default TRUE.
-#'@param withsig TRUE to return significance. Default TRUE.
-#'@param verbose TRUE for progress reports. Default TRUE.
-#'@param version 'speed' for speed-optimized, 'memory' for memory optimized. Default 'speed'; if you run into memory problems, try decreasing blocksize first.
-#'@export
-#'@examples
-#'get_scores(pa_matrix, distance_matrix, 'fraction', list(0.1, TRUE), 10, TRUE, TRUE, TRUE)
+#' This function identifies close pairs of samples, computes close-pair weights,
+#' collapses traits with identical directional discordance patterns, calculates
+#' DeCoTUR scores and significance at the pattern level, and returns the
+#' significant associations expanded to individual trait pairs.
+#'
+#' @param pa_matrix A presence-absence matrix. Rows are traits and columns are
+#'   samples. Row names should contain trait names.
+#' @param distance_matrix A pairwise distance matrix. Row and column order
+#'   should correspond to the columns of `pa_matrix`.
+#' @param closepair_method Method used to select close pairs. One of
+#'   `"distance"`, `"fraction"`, or `"fixednumber"`.
+#' @param closepair_params A list of parameters for the selected close-pair
+#'   method. For `"distance"`, supply the distance cutoff and `show_hist`.
+#'   For `"fraction"`, supply the distance fraction and `show_hist`.
+#'   For `"fixednumber"`, supply the number of close pairs, random seed,
+#'   and `show_hist`.
+#' @param downweight Logical; whether to downweight close-pair classes.
+#' @param verbose Logical; whether to display progress messages.
+#'
+#' @return A data frame containing significantly associated trait pairs and
+#'   their DeCoTUR scores.
+#'
+#' @export
+get_scores <- function(
+    pa_matrix,
+    distance_matrix,
+    closepair_method,
+    closepair_params,
+    downweight = TRUE,
+    verbose = FALSE
+) {
 
-get_scores <- function(pa_matrix, distance_matrix, closepair_method, closepair_params, blocksize, downweight = TRUE, withsig = TRUE, verbose = TRUE, version = 'speed'){
-  if(verbose){print('Starting function.')}
-  if(closepair_method == 'distance'){
-    if(length(closepair_params) != 2){
-      stop('Incorrect number of closepair_params. (Should be 2).')
+  .verbose_message(verbose, "Starting analysis.")
+
+  ## ------------------------------------------------------------
+  ## 1. Obtain close pairs
+  ## ------------------------------------------------------------
+
+  if (closepair_method == "distance") {
+
+    if (length(closepair_params) != 2) {
+      stop(
+        "Incorrect number of closepair_params for method 'distance'. ",
+        "Expected: distance cutoff and show_hist."
+      )
     }
-    distance_cutoff <- closepair_params[[1]]
-    show_hist <- closepair_params[[2]]
-    close_pairs <- get_closepairs_distance(distance_matrix, distance_cutoff, show_hist, verbose)
-  } else if(closepair_method == 'fraction'){
-    if(length(closepair_params) != 2){
-      stop('Incorrect number of closepair_params. (Should be 2).')
+
+    close_pairs <- get_closepairs_distance(
+      distance_matrix,
+      closepair_params[[1]],
+      closepair_params[[2]],
+      verbose
+    )
+
+  } else if (closepair_method == "fraction") {
+
+    if (length(closepair_params) != 2) {
+      stop(
+        "Incorrect number of closepair_params for method 'fraction'. ",
+        "Expected: distance fraction and show_hist."
+      )
     }
-    distance_fraction <- closepair_params[[1]]
-    show_hist <- closepair_params[[2]]
-    close_pairs <- get_closepairs_fraction(distance_matrix, distance_fraction, show_hist, verbose)
-  } else if(closepair_method == 'fixednumber'){
-    number_close_pairs <- closepair_params[[1]]
-    seed <- closepair_params[[2]]
-    show_hist <- closepair_params[[3]]
-    close_pairs <- get_closepairs_fixednumber(distance_matrix, number_close_pairs, seed, show_hist, verbose)
-  } else{stop('Unidentified close pair method (should be one of: distance, fraction, fixednumber).')}
-  if(verbose){
-    print(paste0('Obtained ',  dim(close_pairs)[1], ' close pairs.'))
+
+    close_pairs <- get_closepairs_fraction(
+      distance_matrix,
+      closepair_params[[1]],
+      closepair_params[[2]],
+      verbose
+    )
+
+  } else if (closepair_method == "fixednumber") {
+
+    if (length(closepair_params) != 3) {
+      stop(
+        "Incorrect number of closepair_params for method 'fixednumber'. ",
+        "Expected: number of close pairs, seed, and show_hist."
+      )
+    }
+
+    close_pairs <- get_closepairs_fixednumber(
+      distance_matrix,
+      closepair_params[[1]],
+      closepair_params[[2]],
+      closepair_params[[3]],
+      verbose
+    )
+
+  } else {
+
+    stop(
+      "Unidentified close-pair method. Use 'distance', ",
+      "'fraction', or 'fixednumber'."
+    )
   }
-  classes <- get_closepair_classes(close_pairs)
-  if(verbose){print('Obtained close pair classes.')}
-  if(downweight){
-    class_weights <- get_classweights(classes)
-  } else{
-    class_weights <- rep(1, length(classes))
-  }
-  if(verbose){print('Obtained close pair class weights.')}
-  ## close_pairs still contains indices into the original distance matrix
+
+  .verbose_message(
+    verbose,
+    "Obtained ", nrow(close_pairs), " close pairs."
+  )
+
+  ## ------------------------------------------------------------
+  ## 2. Save close-pair distances BEFORE reindexing
+  ## ------------------------------------------------------------
+
+  # close_pairs currently indexes the original distance matrix.
+  # filter_traits_by_closepairs() subsequently reindexes these pairs
+  # relative to the subsetted presence-absence matrix.
   dpds <- as.numeric(distance_matrix[close_pairs])
-  pam <- filter_traits_by_closepairs(pa_matrix, close_pairs)
+
+  ## ------------------------------------------------------------
+  ## 3. Calculate close-pair weights
+  ## ------------------------------------------------------------
+
+  classes <- get_closepair_classes(close_pairs)
+
+  if (downweight) {
+    class_weights <- get_classweights(classes)
+  } else {
+    class_weights <- rep(1, nrow(close_pairs))
+  }
+
+  .verbose_message(verbose, "Obtained close-pair weights.")
+
+  ## ------------------------------------------------------------
+  ## 4. Filter traits and samples
+  ## ------------------------------------------------------------
+
+  pam <- filter_traits_by_closepairs(
+    pa_matrix,
+    close_pairs
+  )
+
   pa_matrix <- pam[[1]]
   close_pairs <- pam[[2]]
-  scores <- get_scores_pa_closepairs(pa_matrix, close_pairs, class_weights, blocksize, verbose, version, withsig)
-  if(verbose){print('Obtained scores.')}
-  if(withsig){
-    if(verbose){print('Computing discordance information.')}
-    discdat <- get_discordances(pa_matrix, close_pairs, verbose) # need to fix this function to get the right row_names
-    if(verbose){print('Obtained discordance information.')}
-    if(verbose){print('Computing significance')}
-    dpds[which(dpds < 0)] <- 1/(2*1000000)# hardcoded. apologies. shouldn't really matter.
-    disc1 <- discdat$disc[match(scores$Trait1, discdat$trait)]
-    disc2 <- discdat$disc[match(scores$Trait2, discdat$trait)]
-    sum <- scores$UnweightedPositive + scores$UnweightedNegative
-    m <- rep(1, dim(close_pairs)[1])
-    ndpds <- dpds/sum(dpds)
-    ndpds[which(ndpds == 0)] <- min(ndpds[which(ndpds > 0)])/100
-    # The null model is a Poisson Binomial with rate:
-    # gene1_discordance*gene2_discordance*normalized close pair core distances^2
-    # So I need a matrix where each column is a gene pair and each row is a close pair
-    # wait I want to compare scores with an rpbinom parameter, so I want the transverse
-    # I will have to double-check this, but right now I am just debugging the speed of this function
-    blocksize <- min(3000, dim(pa_matrix)[1])
-    numblocks <- length(disc1) %/% blocksize
-    leftover <- length(disc1) %% blocksize
-    #t <- proc.time()
-    res <- c()
-    for(i in 1:numblocks){
-      start <- (i-1)*blocksize+1
-      end <- i*blocksize
-      spbmat <- ( disc1[start:end] * disc2[start:end] ) %*% t(ndpds^2)
-      spbmat[which(is.na(spbmat))] <- 0
-      spbmat[which(is.nan(spbmat))] <- 0
-      spbmat[which(spbmat < 0)] <- 0
-      spbmat[which(spbmat > 1)] <- 1
-      res <- c(res, apply(spbmat, 1, function(x){
-        qpbinom_modified(1-0.05/length(disc1), x, method = 'RefinedNormal')
-      }))
-    }
-    if(leftover > 0){
-      start <- i*blocksize + 1
-      end <- length(disc1)
-      spbmat <- ( disc1[start:end] * disc2[start:end] ) %*% t(ndpds^2)
-      spbmat[which(is.na(spbmat))] <- 0
-      spbmat[which(is.nan(spbmat))] <- 0
-      spbmat[which(spbmat < 0)] <- 0
-      spbmat[which(spbmat > 1)] <- 1
-      res <- c(res, apply(spbmat, 1, function(x){
-        qpbinom_modified(1-0.05/length(disc1), x, method = 'RefinedNormal')
-      }))
-    }
-    #print(proc.time() - t)
-    # then we have
-    scores$sig <- sum > res
-    #pbmat <- (disc1 * disc2) %*% t(ndpds^2)
-    # running into memory issues here, which is why I used the block method above
-    if(verbose){print('Obtained significance')}
-  }
-  return(scores)
-}
 
+  n_traits <- nrow(pa_matrix)
+  n_tests <- choose(n_traits, 2)
+
+  .verbose_message(
+    verbose,
+    "Retained ", n_traits, " traits representing ",
+    format(n_tests, big.mark = ","),
+    " trait-pair tests."
+  )
+
+  ## ------------------------------------------------------------
+  ## 5. Compute compressed pattern scores
+  ## ------------------------------------------------------------
+
+  scores <- .get_scores_pa_closepairs(
+    pa_matrix = pa_matrix,
+    close_pairs = close_pairs,
+    classweights = class_weights,
+    verbose = verbose
+  )
+
+  pattern_map <- attr(scores, "pattern_map")
+
+  ## ------------------------------------------------------------
+  ## 6. Prepare close-pair distances for null model
+  ## ------------------------------------------------------------
+
+  # Preserve the behavior of the previous implementation for negative
+  # distances.
+  dpds[dpds < 0] <- 1 / (2 * 1000000)
+
+  ndpds <- dpds / sum(dpds)
+
+  # Replace exact zeros with a small positive value.
+  if (any(ndpds == 0)) {
+
+    positive_dpds <- ndpds[ndpds > 0]
+
+    if (length(positive_dpds) == 0) {
+      stop("All close-pair distances are zero.")
+    }
+
+    ndpds[ndpds == 0] <-
+      min(positive_dpds) / 100
+  }
+
+  ## ------------------------------------------------------------
+  ## 7. Compute significance at the pattern level
+  ## ------------------------------------------------------------
+
+  .verbose_message(verbose, "Computing significance.")
+
+  # The null probability vector depends on a trait pair only through
+  # the product of its two discordance counts. Therefore, calculate
+  # the critical value only once for each unique product.
+  dprod <-
+    scores$Discordance1 *
+    scores$Discordance2
+
+  unique_dprod <- sort(unique(dprod))
+
+  q <- ndpds^2
+
+  # Bonferroni correction is based on the number of actual trait-pair
+  # hypotheses, not the number of compressed pattern pairs.
+  alpha <- 0.05 / n_tests
+
+  critical_values <- numeric(length(unique_dprod))
+
+  for (i in seq_along(unique_dprod)) {
+
+    probs <- unique_dprod[i] * q
+
+    probs[!is.finite(probs)] <- 0
+    probs[probs < 0] <- 0
+    probs[probs > 1] <- 1
+
+    critical_values[i] <- qpbinom_modified(
+      1 - alpha,
+      probs,
+      method = "RefinedNormal"
+    )
+  }
+
+  scores$CriticalValue <-
+    critical_values[match(dprod, unique_dprod)]
+
+  scores$Observed <-
+    scores$UnweightedPositive +
+    scores$UnweightedNegative
+
+  scores$sig <-
+    scores$Observed > scores$CriticalValue
+
+  .verbose_message(
+    verbose,
+    "Found ",
+    sum(scores$sig),
+    " significant close-pair pattern combinations."
+  )
+
+  ## ------------------------------------------------------------
+  ## 8. Keep significant patterns and expand to trait pairs
+  ## ------------------------------------------------------------
+
+  significant_scores <- scores[
+    scores$sig,
+    ,
+    drop = FALSE
+  ]
+
+  if (nrow(significant_scores) == 0) {
+
+    .verbose_message(
+      verbose,
+      "No significant trait associations found."
+    )
+
+    return(
+      data.frame(
+        Trait1 = character(),
+        Trait2 = character(),
+        PositiveAssociation = numeric(),
+        NegativeAssociation = numeric(),
+        Score = numeric(),
+        UnweightedPositive = numeric(),
+        UnweightedNegative = numeric(),
+        sig = logical(),
+        stringsAsFactors = FALSE
+      )
+    )
+  }
+
+  scores <- .expand_pattern_scores(
+    significant_scores,
+    pattern_map
+  )
+
+  .verbose_message(
+    verbose,
+    "Returning ",
+    format(nrow(scores), big.mark = ","),
+    " significant trait pairs."
+  )
+
+  scores
+}
