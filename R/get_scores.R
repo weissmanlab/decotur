@@ -53,6 +53,8 @@ get_scores <- function(pa_matrix, distance_matrix, closepair_method, closepair_p
     class_weights <- rep(1, length(classes))
   }
   if(verbose){print('Obtained close pair class weights.')}
+  ## close_pairs still contains indices into the original distance matrix
+  dpds <- as.numeric(distance_matrix[close_pairs])
   pam <- filter_traits_by_closepairs(pa_matrix, close_pairs)
   pa_matrix <- pam[[1]]
   close_pairs <- pam[[2]]
@@ -63,8 +65,6 @@ get_scores <- function(pa_matrix, distance_matrix, closepair_method, closepair_p
     discdat <- get_discordances(pa_matrix, close_pairs, verbose) # need to fix this function to get the right row_names
     if(verbose){print('Obtained discordance information.')}
     if(verbose){print('Computing significance')}
-    dpds <- distance_matrix[close_pairs]
-    dpds <- as.numeric(dpds)
     dpds[which(dpds < 0)] <- 1/(2*1000000)# hardcoded. apologies. shouldn't really matter.
     disc1 <- discdat$disc[match(scores$Trait1, discdat$trait)]
     disc2 <- discdat$disc[match(scores$Trait2, discdat$trait)]
