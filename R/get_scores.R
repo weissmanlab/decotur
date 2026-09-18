@@ -175,61 +175,64 @@ get_scores <- function(
 
   ndpds <- dpds / sum(dpds)
 
-  ## ------------------------------------------------------------
-  ## 7. Compute significance at the pattern level
-  ## ------------------------------------------------------------
+## ------------------------------------------------------------
+## 7. Compute significance at the pattern level
+## ------------------------------------------------------------
 
-  .verbose_message(verbose, "Computing significance.")
+.verbose_message(verbose, "Computing significance.")
 
-  # The null probability vector depends on a trait pair only through
-  # the product of its two discordance counts. Therefore, calculate
-  # the critical value only once for each unique product.
-  dprod <-
-    scores$Discordance1 *
-    scores$Discordance2
+scores$Observed <-
+  scores$UnweightedPositive +
+  scores$UnweightedNegative
 
-  unique_dprod <- sort(unique(dprod))
+scores$dprod <-
+  scores$Discordance1 *
+  scores$Discordance2
 
-  q <- ndpds^2
+n_traits_tested <- nrow(pa_matrix)
+n_tests <- choose(n_traits_tested, 2)
+alpha <- 0.05 / n_tests
 
-  # Bonferroni correction is based on the number of actual trait-pair
-  # hypotheses, not the number of compressed pattern pairs.
-  alpha <- 0.05 / n_tests
+q <- ndpds^2
 
-  critical_values <- numeric(length(unique_dprod))
+## Unique statistical tests
+tests <- unique(
+  scores[, c("dprod", "Observed")]
+)
 
-  for (i in seq_along(unique_dprod)) {
+.verbose_message(
+  verbose,
+  "Evaluating ",
+  nrow(tests),
+  " unique null/observation combinations."
+)
 
-    probs <- unique_dprod[i] * q
+tests$pvalue <- NA_real_
 
-    probs[!is.finite(probs)] <- 0
-    probs[probs < 0] <- 0
-    probs[probs > 1] <- 1
+for (i in seq_len(nrow(tests))) {
 
-    critical_values[i] <- qpbinom_modified(
-      1 - alpha,
-      probs,
-      method = "RefinedNormal"
-    )
-  }
+  probs <- tests$dprod[i] * q
 
-  scores$CriticalValue <-
-    critical_values[match(dprod, unique_dprod)]
+  probs[!is.finite(probs)] <- 0
+  probs[probs < 0] <- 0
+  probs[probs > 1] <- 1
 
-  scores$Observed <-
-    scores$UnweightedPositive +
-    scores$UnweightedNegative
+  tests$pvalue[i] <- PoissonBinomial::ppbinom(tests$Observed[i] - 1,
+        probs, method = "RefinedNormal", lower.tail = FALSE)
+}
 
-  scores$sig <-
-    scores$Observed > scores$CriticalValue
+    tests$sig <- tests$pvalue < alpha
 
-  .verbose_message(
-    verbose,
-    "Found ",
-    sum(scores$sig),
-    " significant close-pair pattern combinations."
-  )
+    test_key <- paste(tests$dprod, tests$Observed, sep = ":")
+    score_key <- paste(scores$dprod, scores$Observed, sep = ":")
 
+    m <- match(score_key, test_key)
+
+    scores$pvalue <- tests$pvalue[m]
+    scores$sig <- tests$sig[m]
+
+    scores$dprod <- NULL
+    
   ## ------------------------------------------------------------
   ## 8. Keep significant patterns and expand to trait pairs
   ## ------------------------------------------------------------
