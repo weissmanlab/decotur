@@ -169,7 +169,7 @@ get_scores <- function(
   if (any(!is.finite(dpds))) {stop("Close-pair distances contain non-finite values.")}
 
   if (any(dpds < 0)) {
-    .verbose_message(verbose, sum(dpds < 0), " negative close-pair distances were set to zero.")
+    warning(sum(dpds < 0), " negative close-pair distances were set to zero.")
     dpds[dpds < 0] <- 0
   }
     
