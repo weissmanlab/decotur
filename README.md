@@ -5,6 +5,9 @@ For questions please email rohan.mehta@elmhurst.edu.
 This package computes the "coevolution score" presented in [this manuscript](https://link.springer.com/article/10.1186/s12859-023-05363-4).
 
 ## Updates
+
+10/15/26 - Dramatically refactored code to make the process many many times faster. In addition, now only returns significant pairs. 
+
 3/7/2023 - Removed a line of debug code that I missed earlier.
 
 2/2/2023 - Updated all code in preparation for manuscript submission
