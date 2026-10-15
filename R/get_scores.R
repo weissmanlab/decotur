@@ -188,9 +188,7 @@ scores$Observed <-
 scores$dprod <-
   scores$Discordance1 *
   scores$Discordance2
-
-n_traits_tested <- nrow(pa_matrix)
-n_tests <- choose(n_traits_tested, 2)
+    
 alpha <- 0.05 / n_tests
 
 q <- ndpds^2
@@ -259,6 +257,7 @@ for (i in seq_len(nrow(tests))) {
         Score = numeric(),
         UnweightedPositive = numeric(),
         UnweightedNegative = numeric(),
+        pvalue = numeric(),
         sig = logical(),
         stringsAsFactors = FALSE
       )
