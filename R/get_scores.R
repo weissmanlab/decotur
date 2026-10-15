@@ -124,19 +124,9 @@ for (g in groups) {
   ## 8. Keep significant patterns and expand to trait pairs
   ## ------------------------------------------------------------
 
-  significant_scores <- scores[
-    scores$sig,
-    ,
-    drop = FALSE
-  ]
-
+  significant_scores <- scores[scores$sig,,drop = FALSE]
   if (nrow(significant_scores) == 0) {
-
-    .verbose_message(
-      verbose,
-      "No significant trait associations found."
-    )
-
+    .verbose_message(verbose, "No significant trait associations found.")
     return(
       data.frame(
         Trait1 = character(),
@@ -152,18 +142,7 @@ for (g in groups) {
       )
     )
   }
-
-  scores <- .expand_pattern_scores(
-    significant_scores,
-    pattern_map
-  )
-
-  .verbose_message(
-    verbose,
-    "Returning ",
-    format(nrow(scores), big.mark = ","),
-    " significant trait pairs."
-  )
-
+  scores <- .expand_pattern_scores(significant_scores, pattern_map)
+  .verbose_message(verbose, "Returning ", format(nrow(scores), big.mark = ","), " significant trait pairs.")
   scores
 }
