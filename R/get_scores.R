@@ -194,41 +194,33 @@ alpha <- 0.05 / n_tests
 q <- ndpds^2
 
 ## Unique statistical tests
-tests <- unique(
-  scores[, c("dprod", "Observed")]
-)
-
-.verbose_message(
-  verbose,
-  "Evaluating ",
-  nrow(tests),
-  " unique null/observation combinations."
-)
-
+tests <- unique(scores[, c("dprod", "Observed")])
+.verbose_message(verbose, "Evaluating ", nrow(tests), " unique null/observation combinations.")
+groups <- split(seq_len(nrow(tests)), tests$dprod)
 tests$pvalue <- NA_real_
-
-for (i in seq_len(nrow(tests))) {
-
-  probs <- tests$dprod[i] * q
-
-  probs[!is.finite(probs)] <- 0
-  probs[probs < 0] <- 0
-  probs[probs > 1] <- 1
-
-  tests$pvalue[i] <- PoissonBinomial::ppbinom(tests$Observed[i] - 1,
-        probs, method = "RefinedNormal", lower.tail = FALSE)
-}
-
+.verbose_message(verbose, "Evaluating ", length(groups), " unique null distributions for ", nrow(tests), " null/observation combinations." )
+if (verbose) {
+    pb <- progress::progress_bar$new(
+      format = "  Computing significance [:bar] :percent eta: :eta",
+      total = length(groups),
+      clear = FALSE
+    )
+    pb$tick(0)
+  }
+for (g in groups) {
+    d <- tests$dprod[g[1]]
+    probs <- d * q
+    probs[!is.finite(probs)] <- 0
+    probs <- pmin(pmax(probs, 0), 1)
+    tests$pvalue[g] <- PoissonBinomial::ppbinom(tests$Observed[g] - 1, probs, method = "RefinedNormal", lower.tail = FALSE)
+    if (verbose) {pb$tick()}
+  }
     tests$sig <- tests$pvalue < alpha
-
     test_key <- paste(tests$dprod, tests$Observed, sep = ":")
     score_key <- paste(scores$dprod, scores$Observed, sep = ":")
-
     m <- match(score_key, test_key)
-
     scores$pvalue <- tests$pvalue[m]
     scores$sig <- tests$sig[m]
-
     scores$dprod <- NULL
     
   ## ------------------------------------------------------------
