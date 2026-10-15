@@ -25,174 +25,71 @@
 #'   their DeCoTUR scores.
 #'
 #' @export
-get_scores <- function(
-    pa_matrix,
-    distance_matrix,
-    closepair_method,
-    closepair_params,
-    downweight = TRUE,
-    verbose = FALSE
-) {
-
+get_scores <- function(pa_matrix, distance_matrix, closepair_method, closepair_params, downweight = TRUE, verbose = FALSE) {
   .verbose_message(verbose, "Starting analysis.")
-
   ## ------------------------------------------------------------
   ## 1. Obtain close pairs
   ## ------------------------------------------------------------
-
   if (closepair_method == "distance") {
-
-    if (length(closepair_params) != 2) {
-      stop(
-        "Incorrect number of closepair_params for method 'distance'. ",
-        "Expected: distance cutoff and show_hist."
-      )
-    }
-
-    close_pairs <- get_closepairs_distance(
-      distance_matrix,
-      closepair_params[[1]],
-      closepair_params[[2]],
-      verbose
-    )
-
+    if (length(closepair_params) != 2) {stop("Incorrect number of closepair_params for method 'distance'. ", "Expected: distance cutoff and show_hist.")}
+    close_pairs <- get_closepairs_distance(distance_matrix, closepair_params[[1]], closepair_params[[2]], verbose)
   } else if (closepair_method == "fraction") {
-
-    if (length(closepair_params) != 2) {
-      stop(
-        "Incorrect number of closepair_params for method 'fraction'. ",
-        "Expected: distance fraction and show_hist."
-      )
-    }
-
-    close_pairs <- get_closepairs_fraction(
-      distance_matrix,
-      closepair_params[[1]],
-      closepair_params[[2]],
-      verbose
-    )
-
+    if (length(closepair_params) != 2) {stop("Incorrect number of closepair_params for method 'fraction'. ", "Expected: distance fraction and show_hist.")}
+    close_pairs <- get_closepairs_fraction(distance_matrix, closepair_params[[1]], closepair_params[[2]], verbose)
   } else if (closepair_method == "fixednumber") {
-
-    if (length(closepair_params) != 3) {
-      stop(
-        "Incorrect number of closepair_params for method 'fixednumber'. ",
-        "Expected: number of close pairs, seed, and show_hist."
-      )
-    }
-
-    close_pairs <- get_closepairs_fixednumber(
-      distance_matrix,
-      closepair_params[[1]],
-      closepair_params[[2]],
-      closepair_params[[3]],
-      verbose
-    )
-
-  } else {
-
-    stop(
-      "Unidentified close-pair method. Use 'distance', ",
-      "'fraction', or 'fixednumber'."
-    )
-  }
-
-  .verbose_message(
-    verbose,
-    "Obtained ", nrow(close_pairs), " close pairs."
-  )
-
+    if (length(closepair_params) != 3) {stop("Incorrect number of closepair_params for method 'fixednumber'. ", "Expected: number of close pairs, seed, and show_hist.")}
+    close_pairs <- get_closepairs_fixednumber(distance_matrix, closepair_params[[1]], closepair_params[[2]], closepair_params[[3]], verbose)
+  } else {stop("Unidentified close-pair method. Use 'distance', ", "'fraction', or 'fixednumber'.")}
+  .verbose_message(verbose, "Obtained ", nrow(close_pairs), " close pairs.")
   ## ------------------------------------------------------------
   ## 2. Save close-pair distances BEFORE reindexing
   ## ------------------------------------------------------------
-
   # close_pairs currently indexes the original distance matrix.
   # filter_traits_by_closepairs() subsequently reindexes these pairs
   # relative to the subsetted presence-absence matrix.
   dpds <- as.numeric(distance_matrix[close_pairs])
-
   ## ------------------------------------------------------------
   ## 3. Calculate close-pair weights
   ## ------------------------------------------------------------
-
   classes <- get_closepair_classes(close_pairs)
-
   if (downweight) {
     class_weights <- get_classweights(classes)
   } else {
     class_weights <- rep(1, nrow(close_pairs))
   }
-
   .verbose_message(verbose, "Obtained close-pair weights.")
-
   ## ------------------------------------------------------------
   ## 4. Filter traits and samples
   ## ------------------------------------------------------------
-
-  pam <- filter_traits_by_closepairs(
-    pa_matrix,
-    close_pairs
-  )
-
+  pam <- filter_traits_by_closepairs(pa_matrix, close_pairs)
   pa_matrix <- pam[[1]]
   close_pairs <- pam[[2]]
-
   n_traits <- nrow(pa_matrix)
   n_tests <- choose(n_traits, 2)
-
-  .verbose_message(
-    verbose,
-    "Retained ", n_traits, " traits representing ",
-    format(n_tests, big.mark = ","),
-    " trait-pair tests."
-  )
-
+  .verbose_message(verbose, "Retained ", n_traits, " traits representing ", format(n_tests, big.mark = ","), " trait-pair tests.")
   ## ------------------------------------------------------------
   ## 5. Compute compressed pattern scores
   ## ------------------------------------------------------------
-
-  scores <- .get_scores_pa_closepairs(
-    pa_matrix = pa_matrix,
-    close_pairs = close_pairs,
-    classweights = class_weights,
-    verbose = verbose
-  )
-
+  scores <- .get_scores_pa_closepairs(pa_matrix = pa_matrix, close_pairs = close_pairs, classweights = class_weights, verbose = verbose)
   pattern_map <- attr(scores, "pattern_map")
-
   ## ------------------------------------------------------------
   ## 6. Prepare close-pair distances for null model
   ## ------------------------------------------------------------
-
   if (any(!is.finite(dpds))) {stop("Close-pair distances contain non-finite values.")}
-
   if (any(dpds < 0)) {
     warning(sum(dpds < 0), " negative close-pair distances were set to zero.")
     dpds[dpds < 0] <- 0
   }
-    
   if (sum(dpds) == 0) {stop("Close-pair distances must contain at least one positive value.")}
-
   ndpds <- dpds / sum(dpds)
-
 ## ------------------------------------------------------------
 ## 7. Compute significance at the pattern level
 ## ------------------------------------------------------------
-
 .verbose_message(verbose, "Computing significance.")
-
-scores$Observed <-
-  scores$UnweightedPositive +
-  scores$UnweightedNegative
-
-scores$dprod <-
-  scores$Discordance1 *
-  scores$Discordance2
-    
+scores$Observed <- scores$UnweightedPositive + scores$UnweightedNegative
+scores$dprod <- scores$Discordance1 * scores$Discordance2
 alpha <- 0.05 / n_tests
-
 q <- ndpds^2
-
 ## Unique statistical tests
 tests <- unique(scores[, c("dprod", "Observed")])
 .verbose_message(verbose, "Evaluating ", nrow(tests), " unique null/observation combinations.")
