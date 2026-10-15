@@ -62,6 +62,7 @@
     d$UnweightedNegative <- rep(pattern_scores$UnweightedNegative[i], n)
 
     if ("sig" %in% names(pattern_scores)) {d$sig <- rep(pattern_scores$sig[i], n)}
+    if ("pvalue" %in% names(pattern_scores)) {d$pvalue <- rep(pattern_scores$pvalue[i], n)}
 
     out[[i]] <- d
   }
